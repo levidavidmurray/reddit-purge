@@ -7,14 +7,32 @@ import configparser
 import requests
 import requests.auth
 
-
 base_url = 'https://oauth.reddit.com'
-del_url = '{0}/api/del'.format(base_url)
+delete_url = '{0}/api/del'.format(base_url)
+
+delete_map = {
+  '0': 'BOTH',
+  '1': 'COMMENTS',
+  '2': 'POSTS'
+}
 
 def main():
-  account = get_credentials()
-  token = get_token(account)
-  delete_comments(account['username'], token)
+  print('[Reddit Purger]\n')
+      
+  del_code = get_delete_code() # user input to specify what to delete
+  account = get_credentials() # account credentials set in account.ini
+  token = get_token(account) # access token returned by the reddit API
+  delete(account['username'], token, delete_map[del_code]) # delete specified content
+
+def get_delete_code():
+  print('What do you wish to delete?\n')
+  print('0 - Comments and Posts')
+  print('1 - Comments Only')
+  print('2 - Posts Only')
+
+  del_code = input('\nEnter value: ')
+
+  return del_code
 
 def get_credentials():
   config = configparser.ConfigParser()
@@ -22,44 +40,11 @@ def get_credentials():
   account = config['ACCOUNT']
 
   for key in account:
-    if not account[key]:
+    if not account[key]: # config value in account.ini was left empty
       print('Please verify account.ini values')
       sys.exit()
       
-  
   return account
-
-def delete_comments(username, token):
-  authorization = 'bearer {0}'.format(token)
-  user_agent = 'ChangeMeClient/0.1 by {0}'.format(username)
-
-  comments_url = '{0}/user/{1}/comments'.format(base_url, username)
-  headers = {"Authorization": authorization, "User-Agent": user_agent}
-
-  comments_exist = True
-
-  while True:
-    response = requests.get(comments_url, headers=headers, params={'limit': '100'})
-    response = response.json()
-    comments = response['data']['children']
-
-    c_len = len(comments)
-
-    if c_len == 0:
-      print('Your comments are purged!')
-      break
-
-    print('{0}/100 comments found'.format(c_len))
-
-    i = 1
-
-    for comment in comments:
-      comment_id = comment['data']['name']
-      params = {'id': comment_id}
-      del_res = requests.post(del_url, headers=headers, params=params)
-      print('Comment \'{0}\' deleted ({1}/{2})'.format(comment_id, i, c_len))
-      i = i + 1
-
 
 def get_token(account):
   username = account['username']
@@ -67,6 +52,7 @@ def get_token(account):
   app_id = account['app_id']
   secret = account['secret']
 
+  # Request sent to reddit API to retrieve access token for account API usage
   client_auth = requests.auth.HTTPBasicAuth(app_id, secret)
   post_data = {"grant_type": "password", "username": username, "password": password}
   headers = {"User-Agent": "ChangeMeClient/0.1 by {0}".format(username)}
@@ -74,17 +60,88 @@ def get_token(account):
 
   response = response.json()
 
-  if response['error']:
-    if response['error'] == 'invalid_grant':
+  if 'error' in response:
+    if response['error'] == 'invalid_grant': # Username and password do not work
       print('Verify username and password in account.ini')
       sys.exit()
-    else:
+    else: # app_id or secret are not recognized
       print('Verify app_id and secret in account.ini')
       sys.exit()
 
-  token = response.json()['access_token']
+  # access token used to make API calls for this specific user
+  token = response['access_token']
 
   return token
 
+
+def delete(username, token, del_method):
+  authorization = 'bearer {0}'.format(token) # Access token
+  user_agent = 'ChangeMeClient/0.1 by {0}'.format(username)
+  headers = {"Authorization": authorization, "User-Agent": user_agent}
+
+  # Deleting comments and posts
+  if del_method == 'BOTH':
+    print('Deleting all comments and posts for {0}'.format(username))
+    to_delete = ['comments', 'submitted']
+
+    for content in to_delete:
+      delete_content(content, username, headers)
+
+  # Deleting only comments
+  if del_method == 'COMMENTS':
+    print('Deleting all comments for {0}'.format(username))
+    delete_content('comments', username, headers)
+
+  # Deleting only posts
+  if del_method == 'POSTS':
+      print('Deleting all posts for {0}'.format(username))
+      delete_content('submitted', username, headers)
+
+def delete_content(content_type, username, headers):
+  print_type = content_type # either 'comments' or 'submitted'
+
+  # This is just for printing purposes
+  if content_type == 'submitted':
+    print_type = 'posts'
+
+  # URL to user's comments or posts (eg. https://www.reddit.com/user/LeviMurray/comments)
+  content_url = '{0}/user/{1}/{2}'.format(base_url, username, content_type)
+
+  # Loops until content_url returns 0 content objects
+  while True:
+    # reddit API limits requests to 100, not sure if there's a way around it
+    response = requests.get(content_url, headers=headers, params={'limit': '100'})
+    # TODO Find a way to request more than 100 content objects from reddit API
+    response = response.json()
+    content = response['data']['children'] # Array of content objects
+
+    # Number of content objects out of 100 returned
+    content_length = len(content)
+
+    # if content_length is 0, then there are no comments/posts,
+    # and we can exit our deletion loop
+    if content_length == 0:
+      print('Your {0} are purged!'.format(print_type))
+      break
+
+    print('{0}/100 {1} found'.format(content_length, print_type))
+
+    # i is for printing purposes only--showing what content object
+    # out of content_length we are currently deleting
+    i = 1
+
+    # API request loop to hit the delete content endpoint for every comment or post
+    for item in content:
+      # Content identifier the delete endpoint needs to delete the comment/post
+      content_id = item['data']['name']
+      params = {'id': content_id}
+      requests.post(delete_url, headers=headers, params=params) # API request
+      
+      if content_type == 'comments':
+        print('Comment \'{0}\' deleted ({1}/{2})'.format(content_id, i, content_length))
+      else:
+        print('Post \'{0}\' deleted ({1}/{2})'.format(content_id, i, content_length))
+        
+      i = i + 1
 
 main()
