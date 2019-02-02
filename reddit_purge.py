@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-
 import sys
 import json
 import configparser
@@ -11,13 +10,14 @@ base_url = 'https://oauth.reddit.com'
 delete_url = '{0}/api/del'.format(base_url)
 
 delete_map = {
-  '0': 'BOTH',
-  '1': 'COMMENTS',
-  '2': 'POSTS'
+  '7': 'BOTH',
+  '8': 'COMMENTS',
+  '9': 'POSTS'
 }
 
 def main():
-  print('[Reddit Purger]\n')
+  print('[Reddit Purger]')
+  print('WARNING There\'s no going back\n')
       
   del_code = get_delete_code() # user input to specify what to delete
   account = get_credentials() # account credentials set in account.ini
@@ -25,14 +25,39 @@ def main():
   delete(account['username'], token, delete_map[del_code]) # delete specified content
 
 def get_delete_code():
-  print('What do you wish to delete?\n')
-  print('0 - Comments and Posts')
-  print('1 - Comments Only')
-  print('2 - Posts Only')
+  print('What do you wish to delete?')
+  print('0 - Exit')
+  print('7 - Comments and Posts')
+  print('8 - Comments Only')
+  print('9 - Posts Only')
 
-  del_code = input('\nEnter value: ')
+  del_code = input('\nSelect: ')
+
+  if del_code == '0':
+    print('\nExiting...')
+    sys.exit()
+
+  if del_code not in delete_map:
+    print('\nInvalid entry. Exiting...')
+    sys.exit()
+
+  # Double check that user intended chosen option before continuing
+  verify_intentions(del_code) 
 
   return del_code
+
+def verify_intentions(del_code):
+  warning_map = {
+    '7': 'COMMENTS AND POSTS',
+    '8': 'COMMENTS',
+    '9': 'POSTS'
+  }
+
+  intention = input('\nARE YOU SURE YOU WANT TO DELETE ALL {0} [Y/n] '.format(warning_map[del_code]))
+
+  if intention.lower() != 'y':
+    print('Exiting...')
+    sys.exit()
 
 def get_credentials():
   config = configparser.ConfigParser()
