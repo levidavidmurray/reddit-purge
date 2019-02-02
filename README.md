@@ -39,7 +39,7 @@ app_id = fIdR-MDfo6Zcpx
 secret = fJxo0ALVNc_bT1P2A3ro3eXVBdI
 ```
 
-Verify your values are correct, and save the file.
+Verify your values are correct, save the file, and then run the script.
 
 ```shell
 # Command Line
