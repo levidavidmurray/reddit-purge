@@ -2,12 +2,12 @@
 Python script making use of reddit's API to delete all comments or posts from your reddit account
 
 ## Prerequisites
-Ensure you have the python requests module
+#### Ensure you have the python requests module
 ```shell
 pip3 install requests
 ```
 
-Ensure you have a valid reddit app for API usage tied to your account.
+#### Ensure you have a valid reddit app for API usage tied to your account.
 
 1. Go to https://www.reddit.com/prefs/apps/ and click "Create an app"
 2. Name can be whatever you want (e.g. *purge-history*)
